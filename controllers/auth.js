@@ -4,8 +4,8 @@ const generateToken = require("../utils/generateToken")
 
 const signup = async (req, res) => {
     try {
-        const { email, firstName, lastName, password, confirmPassword, mobile } = req.body
-        if(!email || !firstName || !lastName || !password || !confirmPassword)
+        const { email, fullName, password, confirmPassword, phoneNumber } = req.body
+        if(!email || !fullName || !password || !confirmPassword || !phoneNumber)
             return res.status(400).json({success: false, message: "All fields are required."})
 
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -27,7 +27,7 @@ const signup = async (req, res) => {
         const salt = await bcrypt.genSalt(10)
         const hashedPassword = await bcrypt.hash(password, salt)
 
-        const newUser = new userModel({email, firstName, lastName, password: hashedPassword, mobile})
+        const newUser = new userModel({email, fullName, password: hashedPassword, phoneNumber})
         await newUser.save()
 
         return res.status(200).json({success: true, message: "Create account successfully."})
@@ -55,10 +55,9 @@ const loginUser = async (req, res) => {
                 user: 
                     {
                         _id: user?._id, 
-                        firstName: user?.firstName,
-                        lastName: user?.lastName,
+                        fullName: user?.fullName,
                         email: user?.email,
-                        mobile: user?.mobile,
+                        phoneNumber: user?.phoneNumber,
                         token: token
                     }})
         } else {
@@ -85,15 +84,14 @@ const loginAdmin = async (req, res) => {
             return res.status(400).json({success: false, message: "You are not an administrator."})
 
         if(admin && isMatch){
-            const token = generateToken(user._id, res)
+            const token = generateToken(admin._id, res)
             return res.status(200).json({success: true, 
                 user: 
                     {
-                        _id: user?._id, 
-                        firstName: user?.firstName,
-                        lastName: user?.lastName,
-                        email: user?.email,
-                        mobile: user?.mobile,
+                        _id: admin?._id, 
+                        fullName: admin?.fullName,
+                        email: admin?.email,
+                        phoneNumber: admin?.phoneNumber,
                         token: token
                     }})
         } else {
@@ -107,7 +105,11 @@ const loginAdmin = async (req, res) => {
 
 const logout = async (req, res) => {
     try {
-        res.clearCookie('jwt-token')
+        res.clearCookie("jwt-token", {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production", // Must match `setCookie`
+            sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+        });
         return res.status(200).json({message: "Logged out successfully.", success: true})
     } catch (error) {
         console.error("Error in logout controller:", error.message)
@@ -115,4 +117,13 @@ const logout = async (req, res) => {
     }
 }
 
-module.exports = { signup, loginUser, logout, loginAdmin }
+const authCheck = (req, res) => {
+    try {
+        return res.status(200).json({success: true, user: req.user})
+    } catch (error) {
+        console.log("Error in authCheck controller:" + error.message)
+        return res.status(200).json({success: false, message: "Internal server error"})
+    }
+}
+
+module.exports = { signup, loginUser, logout, loginAdmin, authCheck }

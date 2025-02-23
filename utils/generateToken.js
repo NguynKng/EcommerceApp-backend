@@ -6,7 +6,7 @@ const generateTokenAndSetCookie = (userId, res) => {
     res.cookie("jwt-token", token, {
         httpOnly: true,
         secure: NODE_ENV === "production",
-        sameSite: "strict", // Use "none" for localhost development
+        sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax", // Use "none" for localhost development
         maxAge: 864000000
     })
     return token
