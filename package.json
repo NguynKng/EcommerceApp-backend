@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "dev": "node --watch index.js"
+    "dev": "node --watch index.js",
+    "build": "NODE_ENV=production npm install",
+    "start": "node index.js"
   },
   "author": "NguynKng",
   "license": "ISC",
