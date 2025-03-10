@@ -6,6 +6,6 @@ router.post("/signup", signup)
 router.post("/login", loginUser)
 router.post("/logout", logout)
 router.post("/admin-login", loginAdmin)
-router.get("/authCheck", authMiddleware, isAdmin, authCheck)
+router.get("/authCheck", authCheck)
 
 module.exports = router

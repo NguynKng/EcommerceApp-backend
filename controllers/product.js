@@ -1,29 +1,77 @@
 const productModel = require("../models/productModel")
 const userModel = require("../models/userModel")
+const imageModel = require("../models/imageModel")
+const { uploadProductImg } = require("../middlewares/uploadImg")
+const path = require('path');
+const fs = require('fs');
 
 const addProduct = async (req, res) => {
     try {
-        const { name, price, description, slug, category, quantity, color, brand } = req.body
-        if(!name ||!price ||!description ||!category ||!slug ||!quantity ||!color ||!brand)
-            return res.status(400).json({ success: false, message: "All fields are required." })
+    // Use the product upload middleware
+    uploadProductImg.array("images", 10)(req, res, async (err) => {
+        if (err) {
+            return res.status(400).json({ success: false, message: err.message });
+        }
 
-        const existingProduct = await productModel.findOne({ name })
-        if(existingProduct)
-            return res.status(400).json({ success: false, message: "This product is already exists." })
+        const { name, price, description, slug, category, quantity, brand, discount } = req.body;
+        
+        if (!name || !price || !description || !category || !slug || !quantity || !brand) {
+            return res.status(400).json({ success: false, message: "All fields are required." });
+        }
 
-        const newProduct = new productModel({ name, price, description, category, slug, quantity, color, brand })
-        await newProduct.save()
-        return res.status(201).json({ success: true, product: newProduct })
-    } catch(err) {
-        console.error(err)
-        return res.status(500).json({success: false, message: "Error in create product"})
+        const existingProduct = await productModel.findOne({ name });
+        const existingSlug = await productModel.findOne({ slug });
+
+        if (existingProduct)
+            return res.status(400).json({ success: false, message: "This product already exists." });
+        if (existingSlug)
+            return res.status(400).json({ success: false, message: "This slug already exists." });
+
+        // Process images if provided
+        let imageIds = [];
+        if (req.files && req.files.length > 0) {
+            // Create an Image document for each file and collect its ObjectId
+            imageIds = await Promise.all(
+                req.files.map(async (file, index) => {
+                    const imageUrl = `product/${slug}/${file.filename}`;
+                    const imageType = index === 0 ? "thumbnail" : "additional";
+                    const imageDoc = new imageModel({
+                        path: imageUrl,
+                        slug: slug,
+                        type: imageType,
+                    });
+                    await imageDoc.save();
+                    return imageDoc._id;
+                })
+            );
+        }
+
+        // Create and save product document with the image IDs
+        const newProduct = new productModel({
+            name,
+            price,
+            description,
+            category,
+            slug,
+            quantity,
+            brand,
+            discount,
+            images: imageIds, // Store the array of image ObjectIDs
+        });
+        await newProduct.save();
+
+        return res.status(201).json({ success: true, product: newProduct, message: "Add product successfully." });
+    });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, message: "Error creating product." });
     }
-}
+};
 
 const getProductByID = async (req, res) => {
     try {
         const { id } = req.params
-        const product = await productModel.findById(id)
+        const product = await productModel.findById(id).populate('images');
         if(!product)
             return res.status(404).json({ success: false, message: "Product not found."})
         return res.status(200).json({ success: true, product })
@@ -33,9 +81,36 @@ const getProductByID = async (req, res) => {
     }
 }
 
+const getProductBySlug = async (req, res) => {
+    try {
+        const { slug } = req.params;
+        const product = await productModel.findOne({ slug }).populate('images');
+
+        if (!product) {
+            return res.status(404).json({ success: false, message: "Product not found." });
+        }
+        
+        return res.status(200).json({ success: true, product });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, message: "Error in get product by Slug" });
+    }
+}
+
 const getProduct = async (req, res) => {
     try {
-        const products = await productModel.find(req.query)
+        let { query, category } = req.query
+        let filter = {};
+
+        if (query) {
+            filter.name = { $regex: query, $options: "i" };
+        }
+
+        if (category) {
+            filter.category = { $regex: `^${category}$`, $options: "i" };
+        }
+        
+        const products = await productModel.find(filter).populate("images")
         return res.status(200).json({ success: true, products })
     } catch(err) {
         console.error(err)
@@ -45,114 +120,126 @@ const getProduct = async (req, res) => {
 
 const updateProductById = async (req, res) => {
     try {
-        const { id } = req.params
-        const { name, price, description, category, slug, quantity, color, brand } = req.body
-        if(!name ||!price ||!description ||!category ||!slug ||!quantity ||!color ||!brand)
-            return res.status(400).json({ success: false, message: "All fields are required." })
-        
-        const updatedProduct = await productModel.findByIdAndUpdate(id, req.body, {new: true})
-        if(!updatedProduct)
-            return res.status(404).json({ success: false, message: "Product not found."})
-        return res.status(200).json({ success: true, product: updatedProduct })
-    }   catch (err) {
-        console.error(err)
-        return res.status(500).json({success: false, message: "Error in update product"})
+    // Use the product upload middleware
+    uploadProductImg.array("images", 10)(req, res, async (err) => {
+        if (err) {
+            return res.status(400).json({ success: false, message: err.message });
+        }
+
+        const { id } = req.params;
+        const { name, price, description, slug, category, quantity, brand, discount } = req.body;
+
+        if (!name || !price || !description || !category || !slug || !quantity || !brand) {
+            return res.status(400).json({ success: false, message: "All fields are required." });
+        }
+
+        // Find existing product
+        const product = await productModel.findById(id);
+        if (!product) {
+            return res.status(404).json({ success: false, message: "Product not found." });
+        }
+
+        // Parse deleted image IDs if provided.
+        let deleteImageIds = [];
+        if (req.body.deleteImageIds) {
+            try {
+                deleteImageIds = JSON.parse(req.body.deleteImageIds);
+            } catch (parseError) {
+                return res.status(400).json({ success: false, message: "Invalid deleteImageIds format." });
+            }
+        }
+
+        // Remove images specified in deleteImageIds from the product
+        if (deleteImageIds.length > 0) {
+            for (const delId of deleteImageIds) {
+                // Find image document by its ID
+                const imgDoc = await imageModel.findById(delId);
+                if (imgDoc) {
+                    const fullPath = path.join(__dirname, "../public/images/", imgDoc.path);
+                    if (fs.existsSync(fullPath)) {
+                        fs.unlinkSync(fullPath);
+                    }
+                    await imageModel.findByIdAndDelete(delId);
+                }
+            }
+            // Remove deleted IDs from product.images
+            product.images = product.images.filter(imgId => !deleteImageIds.includes(imgId.toString()));
+        }
+
+        // Process new images if provided
+        if (req.files && req.files.length > 0) {
+            const newImageIds = await Promise.all(
+                req.files.map(async (file, index) => {
+                    const imageUrl = `product/${slug}/${file.filename}`;
+                    // If product.images doesn't contain a thumbnail, set the first new image as thumbnail.
+                    // Otherwise, mark as additional.
+                    const imageType = product.images.length === 0 && index === 0 ? "thumbnail" : "additional";
+                    const imageDoc = new imageModel({
+                        path: imageUrl,
+                        slug: slug,
+                        type: imageType,
+                    });
+                    await imageDoc.save();
+                    return imageDoc._id;
+                })
+            );
+            // Append new image IDs to existing product.images array
+            product.images = product.images.concat(newImageIds);
+        }
+
+        // Update other product fields
+        product.name = name;
+        product.price = price;
+        product.description = description;
+        product.slug = slug;
+        product.category = category;
+        product.quantity = quantity;
+        product.brand = brand;
+        product.discount = discount;
+
+        await product.save();
+
+        return res.status(200).json({
+            success: true,
+            product,
+            message: "Product updated successfully."
+        });
+    });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, message: "Error updating product." });
     }
-}
+};
 
 const deleteProductById = async (req, res) => {
     try {
-        const { id } = req.params
-        const deletedProduct = await productModel.findByIdAndDelete(id)
-        if(!deletedProduct)
-            return res.status(404).json({ success: false, message: "Product not found."})
-        return res.status(200).json({ success: true, message: "Product deleted successfully." })
-    } catch(err) {
-        console.error(err)
-        return res.status(500).json({success: false, message: "Error in delete product"})
-    }
-}
-
-const addToWishList = async (req, res) => {
-    const { productId } = req.body
-    const { _id } = req.user
-    try {
-        const user = await userModel.findById(_id)
-        const alreadyAdded = user.wishlist.find((id) => id.toString() === productId)
-        if(alreadyAdded){
-            await userModel.findByIdAndUpdate(
-                _id,
-                { $pull: { wishlist: productId } },
-                { new: true }
-            )
-            return res.status(200).json({ success: true, message: "Product removed from wishlist." })
-        } else {
-            await userModel.findByIdAndUpdate(
-                _id,
-                { $push: { wishlist: productId } },
-                { new: true }
-            )
-            return res.status(200).json({ success: true, message: "Product added to wishlist." })
+        const { id } = req.params;
+        // Find the product first
+        const product = await productModel.findById(id);
+        if (!product) {
+            return res.status(404).json({ success: false, message: "Product not found." });
         }
-    } catch (err){
-        console.error(err)
-        return res.status(500).json({ success: false, message: "Error in add to wish list."})
-    }
-}
-
-const rating = async (req, res) => {
-    const { productId, star, comment } = req.body
-    const { _id } = req.user
-    try {
-        const product = await productModel.findById(productId)
-        const alreadyRated = product.ratings.find((userId) => userId.postedBy.toString() === _id.toString())
-        if(alreadyRated){
-            await productModel.updateOne(
-                {
-                    ratings: { $elemMatch: alreadyRated }
-                },
-                {
-                    $set: {"ratings.$.star": star, "ratings.$.comment": comment, "ratings.$.updatedAt": Date.now()}
-                },
-                {
-                    new: true 
-                }
-            )
-            //return res.status(200).json({ success: true, message: "Rate again for this product successfully." })
-        } else {
-            await productModel.findByIdAndUpdate(
-                productId,
-                { 
-                    $push: {
-                        ratings: {
-                            star: star, 
-                            postedBy: _id,
-                            comment: comment,
-                            createdAt: Date.now()
-                        } 
-                    } 
-                },
-                { 
-                    new: true 
-                }
-            )
-            //return res.status(200).json({ success: true, message: "Rate for this product successfully." })
+        
+        // Construct the folder path based on product.slug
+        const folderPath = path.join(__dirname, "../public/images/product", product.slug);
+        // Delete the folder and all its contents if it exists
+        if (fs.existsSync(folderPath)) {
+            fs.rmSync(folderPath, { recursive: true, force: true });
         }
-        const getAllRatings = await productModel.findById(productId)
-        let totalRating = getAllRatings.ratings.length
-        let ratingSum = getAllRatings.ratings.map((item) => item.star).reduce((prev, curr) => prev + curr, 0)
-        let actualRating = Math.round(ratingSum / totalRating)
 
-        await productModel.findByIdAndUpdate(
-            productId, 
-            { totalRating: actualRating }, 
-            { new: true }
-        )
-        return res.status(200).json({ success: true, message: "Rate for this product successfully." })
-    } catch (err){
-        console.error(err)
-        return res.status(500).json({ success: false, message: "Error in rating product."})
+        // Optionally remove image documents related to this product
+        if (product.images && product.images.length > 0) {
+            await imageModel.deleteMany({ _id: { $in: product.images } });
+        }
+        
+        // Delete the product document
+        await productModel.findByIdAndDelete(id);
+        
+        return res.status(200).json({ success: true, message: "Product deleted successfully." });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, message: "Error deleting product." });
     }
 }
 
-module.exports = { addProduct, getProductByID, getProduct, updateProductById, deleteProductById, addToWishList, rating }
+module.exports = { addProduct, getProductByID, getProduct, getProductBySlug, updateProductById, deleteProductById }

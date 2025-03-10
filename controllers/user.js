@@ -5,7 +5,6 @@ const couponModel = require("../models/couponModel")
 const orderModel = require("../models/orderModel")
 const uniqid = require("uniqid")
 const bcrypt = require("bcrypt")
-const { response } = require("express")
 
 const getUser = async (req, res) => {
     try {
@@ -121,7 +120,7 @@ const updatePassword = async (req, res) => {
 const getWishList = async (req, res) => {
     const { _id } = req.user
     try {
-        const wishlist = await userModel.findById(_id).select("wishlist")
+        const wishlist = await userModel.findById(_id).select("wishlist").populate("images")
 
         if (wishlist.length == 0) {
             return res.status(404).json({ success: false, message: "No wishlist existed." })
@@ -134,73 +133,187 @@ const getWishList = async (req, res) => {
     }
 }
 
-const userCart = async (req, res) => {
-    const { cart } = req.body
-    const { _id } = req.user
+const addToWishList = async (req, res) => {
+    const { productId } = req.body;
+    const { _id } = req.user;
+
     try {
-        let products = []
-        const user = await userModel.findById(_id)
-        const alreadyExistCart = await cartModel.findOne({orderBy: user._id})
-        if(alreadyExistCart){
-            alreadyExistCart.remove()
+        const user = await userModel.findById(_id);
+        const alreadyAdded = user.wishlist.includes(productId);
+
+        // ✅ Update the wishlist
+        if (alreadyAdded) {
+            await userModel.findByIdAndUpdate(
+                _id,
+                { $pull: { wishlist: productId } },
+                { new: true }
+            );
+        } else {
+            await userModel.findByIdAndUpdate(
+                _id,
+                { $push: { wishlist: productId } },
+                { new: true }
+            );
         }
 
-        for(let i = 0; i < cart.length; i++){
-            let object = {}
-            object.product = cart[i]._id
-            object.count = cart[i].count
-            object.color = cart[i].color
-            let getPrice = await productModel.findById(cart[i]._id).select("price").exec()
-            object.price = getPrice.price
-            products.push(object)
-        }
-        let cartTotal = 0
+        // ✅ Fetch updated wishlist with full product details
+        const updatedUser = await userModel.findById(_id)
+            .select("wishlist")
+            .populate({
+                path: "wishlist",
+                populate: { path: "images", select: "_id path type" }, // ✅ Populate images
+                select: "_id name slug price images quantity description",
+            });
 
-        for(let i = 0; i < cart.length; i++){
-            cartTotal += products[i].count * products[i].price
-        }
+        return res.status(200).json({ 
+            success: true, 
+            message: alreadyAdded ? "Product removed from wishlist." : "Product added to wishlist.",
+            updatedWishlist: updatedUser.wishlist // ✅ Fully populated wishlist
+        });
 
-        let newCart = new cartModel({
-            products,
-            cartTotal,
-            orderBy: user._id
-        })
-
-        await newCart.save()
-        return res.status(200).json({ success: true, message: "Cart added successfully."})
     } catch (err) {
-        console.error(err)
-        return res.status(500).json({ success: false, message: "Error in user cart." })
+        console.error(err);
+        return res.status(500).json({ success: false, message: "Error updating wishlist." });
     }
-}
+};
+
+const addToCart = async (req, res) => {
+    const { _id } = req.user; // Logged-in user
+    const { productId, quantity } = req.body; // Product details
+
+    try {
+        // Check if the product exists
+        const product = await productModel.findById(productId);
+        if (!product) {
+            return res.status(404).json({ success: false, message: "Product not found." });
+        }
+
+        // Find or create the user's cart
+        let cart = await cartModel.findOne({ orderBy: _id });
+
+        if (!cart) {
+            cart = new cartModel({ orderBy: _id, items: [], total: 0 });
+        }
+
+        // Check if product already exists in cart
+        const existingItem = cart.items.find(item => item.product.toString() === productId);
+
+        if (existingItem) {
+            // Update quantity and price
+            existingItem.quantity += quantity;
+            existingItem.price = existingItem.quantity * product.price;
+        } else {
+            // Add new product to cart
+            cart.items.push({
+                product: productId,
+                quantity: quantity,
+                price: product.price * quantity,
+            });
+        }
+
+        // Recalculate total price
+        cart.total = cart.items.reduce((sum, item) => sum + item.price, 0);
+
+        // Save the updated cart
+        await cart.save();
+
+        // Update user cart reference
+        await userModel.findByIdAndUpdate(_id, { cart: cart._id });
+
+        // **Populate cart with product details & images**
+        const updatedCart = await cartModel.findById(cart._id)
+            .populate({
+                path: "items.product",
+                populate: { path: "images", select: "_id path type" }, // ✅ Populate images
+                select: "_id name slug price images quantity description",
+            });
+
+        return res.status(200).json({
+            success: true,
+            message: "Product added to cart.",
+            cart: updatedCart,
+        });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, message: "Error adding product to cart." });
+    }
+};
 
 const getUserCart = async (req, res) => {
-    const { _id } = req.user
-    try {
-        const cart = await cartModel.findOne({orderBy: _id}).populate("products.product")
-        if(!cart){
-            return res.status(200).json({ success: true, message: "Cart not found."})
-        }
-        return res.status(200).json({ success: true,  cart})
-    } catch(err) {
-        console.error(err)
-        return res.status(500).json({ success: false, message: "Error in get user cart." })
-    }
-}
+    const { _id } = req.user; // Get user ID
 
-const emptyCart = async (req, res) => {
-    const { _id } = req.user
     try {
-        const cart = await cartModel.findOneAndDelete({orderBy: _id})
-        if(!cart){
-            return res.status(200).json({ success: true, message: "Cart not found"})
+        const cart = await cartModel.findOne({ orderBy: _id })
+            .populate({
+                path: "items.product",
+                populate: { path: "images", select: "_id path type" }, // ✅ Populate images
+                select: "_id name slug price images quantity description",
+            });
+
+        if (!cart) {
+            return res.status(200).json({ success: true, message: "Cart is empty.", cart: { items: [], total: 0 } });
         }
-        return res.status(200).json({ success: true,  message: "Cart successfully removed"})
-    } catch(err) {
-        console.error(err)
-        return res.status(500).json({ success: false, message: "Error in empty cart." })
+
+        return res.status(200).json({ success: true, cart });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, message: "Error fetching cart." });
     }
-}
+};
+
+const removeFromCart = async (req, res) => {
+    const { _id } = req.user; // Get logged-in user
+    const { productId } = req.body; // ✅ Use URL param instead of req.body
+
+    try {
+        let cart = await cartModel.findOne({ orderBy: _id });
+
+        if (!cart) {
+            return res.status(404).json({ success: false, message: "Cart not found." });
+        }
+        // Remove the specific product
+        cart.items = cart.items.filter(item => item.product.toString() !== productId);
+
+        // ✅ Corrected total price calculation
+        cart.total = cart.items.reduce((sum, item) => sum + item.price, 0);
+
+        await cart.save();
+
+        // **Populate cart with product details & images**
+        const updatedCart = await cartModel.findById(cart._id)
+            .populate({
+                path: "items.product",
+                populate: { path: "images", select: "_id path type" }, // ✅ Populate images
+                select: "_id name slug price images quantity description",
+            });
+
+        return res.status(200).json({
+            success: true,
+            message: "Product removed from cart.",
+            cart: updatedCart,
+        });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, message: "Error removing product from cart." });
+    }
+};
+
+const clearCart = async (req, res) => {
+    const { _id } = req.user;
+
+    try {
+        const cart = await cartModel.findOneAndDelete({ user: _id });
+
+        if (!cart) {
+            return res.status(200).json({ success: true, message: "Cart is already empty." });
+        }
+
+        return res.status(200).json({ success: true, message: "Cart successfully cleared." });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, message: "Error clearing cart." });
+    }
+};
 
 const applyCoupon = async (req, res) => {
     const { coupon } = req.body
@@ -302,4 +415,61 @@ const updateOrder = async (req, res) => {
     }
 }
 
-module.exports = { getUser, getUserById, deleteUserById, updateUserById, blockUser, unblockUser, updatePassword, getWishList, userCart, getUserCart, emptyCart, applyCoupon, createOrder, getOrder, updateOrder }
+const rating = async (req, res) => {
+    const { productId, star, comment } = req.body
+    const { _id } = req.user
+    try {
+        const product = await productModel.findById(productId)
+        const alreadyRated = product.ratings.find((userId) => userId.postedBy.toString() === _id.toString())
+        if(alreadyRated){
+            await productModel.updateOne(
+                {
+                    ratings: { $elemMatch: alreadyRated }
+                },
+                {
+                    $set: {"ratings.$.star": star, "ratings.$.comment": comment, "ratings.$.updatedAt": Date.now()}
+                },
+                {
+                    new: true 
+                }
+            )
+            return res.status(200).json({ success: true, message: "Rate again for this product successfully." })
+        } else {
+            await productModel.findByIdAndUpdate(
+                productId,
+                { 
+                    $push: {
+                        ratings: {
+                            star: star, 
+                            postedBy: _id,
+                            comment: comment,
+                            createdAt: Date.now()
+                        } 
+                    } 
+                },
+                { 
+                    new: true 
+                }
+            )
+            //return res.status(200).json({ success: true, message: "Rate for this product successfully." })
+        }
+        const getAllRatings = await productModel.findById(productId)
+        let totalRating = getAllRatings.ratings.length
+        let ratingSum = getAllRatings.ratings.map((item) => item.star).reduce((prev, curr) => prev + curr, 0)
+        let actualRating = Math.round(ratingSum / totalRating)
+
+        await productModel.findByIdAndUpdate(
+            productId, 
+            { totalRating: actualRating }, 
+            { new: true }
+        )
+        return res.status(200).json({ success: true, message: "Rate for this product successfully." })
+    } catch (err){
+        console.error(err)
+        return res.status(500).json({ success: false, message: "Error in rating product."})
+    }
+}
+
+module.exports = { 
+    getUser, getUserById, deleteUserById, updateUserById, blockUser, unblockUser, updatePassword, getWishList, getUserCart,removeFromCart, addToCart, clearCart, applyCoupon, createOrder, getOrder, rating, addToWishList,  updateOrder
+ }

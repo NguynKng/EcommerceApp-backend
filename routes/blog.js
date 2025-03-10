@@ -3,8 +3,8 @@ const { addBlog, getBlogs, getBlogById, updateBlogById, deleteBlogById } = requi
 const { authMiddleware, isAdmin } = require("../middlewares/authMiddleware")
 
 router.post('/add', authMiddleware, isAdmin, addBlog)
-router.get('', authMiddleware, isAdmin, getBlogs)
-router.get('/:id', authMiddleware, isAdmin, getBlogById)
+router.get('', getBlogs)
+router.get('/:id', getBlogById)
 router.put('/:id', authMiddleware, isAdmin, updateBlogById)
 router.delete('/:id', authMiddleware, isAdmin, deleteBlogById)
 

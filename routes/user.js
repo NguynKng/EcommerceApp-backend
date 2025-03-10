@@ -1,14 +1,18 @@
 const router = require("express").Router()
-const { getUser, getUserById, deleteUserById, updateUserById, blockUser, unblockUser, updatePassword, getWishList, userCart, getUserCart, emptyCart, applyCoupon, createOrder, getOrder, updateOrder } = require("../controllers/user")
+const { getUser, getUserById, deleteUserById, updateUserById, blockUser, unblockUser, updatePassword, getWishList,  getUserCart, removeFromCart, clearCart, addToCart, applyCoupon, createOrder, getOrder, updateOrder, rating, addToWishList } = require("../controllers/user")
 const { authMiddleware, isAdmin } = require("../middlewares/authMiddleware")
 
 router.get("/", authMiddleware, isAdmin, getUser)
 
 router.get("/wishlist", authMiddleware, getWishList)
+router.put('/wishlist', authMiddleware, addToWishList)
+router.put('/rating', authMiddleware, rating)
 
 router.get("/cart", authMiddleware, getUserCart)
-router.delete("/cart", authMiddleware, emptyCart)
-router.post("/cart", authMiddleware, userCart)
+router.post("/cart/remove", authMiddleware, removeFromCart)
+router.post("/cart/remove-all", authMiddleware, clearCart)
+router.post("/cart", authMiddleware, addToCart)
+
 router.post("/cart/apply-coupon", authMiddleware, applyCoupon)
 
 router.post("/order", authMiddleware, createOrder)

@@ -1,5 +1,6 @@
 const express = require('express')
 const app = express()
+const path = require('path');
 const { PORT } = require("./config/envVars")
 const connectDB = require("./config/dbConnect")
 const cookieParser = require('cookie-parser')
@@ -16,6 +17,7 @@ const corsOptions = {
 app.use(morgan("dev"))
 app.use(cors(corsOptions))
 app.use(express.json())
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(cookieParser())
 
 app.use('/api/v1', require("./routes/index"))

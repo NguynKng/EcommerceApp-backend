@@ -18,6 +18,10 @@ var productSchema = new mongoose.Schema({
         required: true,
         default: 0
     },
+    discount: {
+        type: Number,
+        default: 0
+    },
     category: {
         type: String,
         required: true
@@ -27,18 +31,13 @@ var productSchema = new mongoose.Schema({
         default: 0,
         required: true
     },
-    sold: {
-        type: Number,
-        default: 0,
-        required: true,
-        select: false
-    },
-    images: {
-        type: Array
-    },
+    images: [{
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: "Image"
+    }]
+    ,
     color: {
         type: String,
-        required: true
     },
     brand: {
         type: String,

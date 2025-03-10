@@ -3,7 +3,7 @@ const { addBrand, getBrand, deleteBrand, updateBrandById, getBrandById } = requi
 const { authMiddleware, isAdmin } = require("../middlewares/authMiddleware")
 
 router.post('/add', authMiddleware, isAdmin, addBrand)
-router.get('', authMiddleware, isAdmin, getBrand)
+router.get('', getBrand)
 router.delete('/:id', authMiddleware, isAdmin, deleteBrand)
 router.put('/:id', authMiddleware, isAdmin, updateBrandById)
 router.get('/:id', authMiddleware, isAdmin, getBrandById)

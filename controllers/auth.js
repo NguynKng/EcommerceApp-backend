@@ -40,68 +40,124 @@ const signup = async (req, res) => {
 
 const loginUser = async (req, res) => {
     try {
-        const { email, password } = req.body
+        const { email, password } = req.body;
 
-        if(!email || !password)
-            return res.status(400).json({success: false, message: "All fields are required."})
-        
-        const user = await userModel.findOne({email: email})
-        const isMatch = await bcrypt.compare(password, user.password)
+        if (!email || !password)
+            return res.status(400).json({ success: false, message: "All fields are required." });
 
-        if(user && isMatch) {
-            const token = generateToken(user._id, res)
+        const user = await userModel
+            .findOne({ email })
+            .populate({
+                path: "cart",
+                populate: {
+                    path: "items.product",
+                    populate: {
+                        path: "images", // ✅ Populate images if they reference another collection
+                        select: "_id path type",
+                    },
+                    select: "_id name slug price images quantity description",
+                },
+            })
+            .populate({
+                path: "wishlist",
+                populate: {
+                    path: "images", // ✅ Populate images for wishlist products
+                    select: "_id path type",
+                },
+                select: "_id name slug price images stock description",
+            });
 
-            return res.status(200).json({success: true, 
-                user: 
-                    {
-                        _id: user?._id, 
-                        fullName: user?.fullName,
-                        email: user?.email,
-                        phoneNumber: user?.phoneNumber,
-                        token: token
-                    }})
-        } else {
-            return res.status(404).json({success: false, message: "Your login credentials don't match an account in our system."})
-        }
+        if (!user)
+            return res.status(404).json({ success: false, message: "Invalid email or password." });
 
-    } catch(err) {
-        console.error(err)
-        return res.status(400).json({success: false, message: "Something went wrong."})
+        const isMatch = await bcrypt.compare(password, user.password);
+
+        if (!isMatch)
+            return res.status(404).json({ success: false, message: "Invalid email or password." });
+
+        const token = generateToken(user._id, res);
+
+        return res.status(200).json({
+            success: true,
+            user: {
+                _id: user._id,
+                fullName: user.fullName,
+                email: user.email,
+                phoneNumber: user.phoneNumber,
+                role: user.role,
+                isBlocked: user.isBlocked,
+                cart: user.cart, // ✅ Now includes product details
+                wishlist: user.wishlist, // ✅ Now includes product details
+                token,
+            },
+        });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, message: "Something went wrong." });
     }
-}
+};
 
 const loginAdmin = async (req, res) => {
     try {
-        const { email, password } = req.body
+        const { email, password } = req.body;
 
-        if(!email || !password)
-            return res.status(400).json({success: false, message: "All fields are required."})
-        
-        const admin = await userModel.findOne({ email: email })
-        const isMatch = await bcrypt.compare(password, admin.password)
+        if (!email || !password)
+            return res.status(400).json({ success: false, message: "All fields are required." });
 
-        if (admin.role !== 'admin')
-            return res.status(400).json({success: false, message: "You are not an administrator."})
+        const admin = await userModel
+            .findOne({ email })
+            .populate({
+                path: "cart",
+                populate: {
+                    path: "items.product",
+                    populate: {
+                        path: "images", // ✅ Populate images if they reference another collection
+                        select: "_id path type",
+                    },
+                    select: "_id name slug price images stock description",
+                },
+            })
+            .populate({
+                path: "wishlist",
+                populate: {
+                    path: "images", // ✅ Populate images for wishlist products
+                    select: "_id path type",
+                },
+                select: "_id name slug price images stock description",
+            });
 
-        if(admin && isMatch){
-            const token = generateToken(admin._id, res)
-            return res.status(200).json({success: true, 
-                user: 
-                    {
-                        _id: admin?._id, 
-                        fullName: admin?.fullName,
-                        email: admin?.email,
-                        phoneNumber: admin?.phoneNumber,
-                        token: token
-                    }})
-        } else {
-            return res.status(404).json({success: false, message: "Your login credentials don't match an account in our system."})
-        }
-    } catch(err) {
-        console.error(err)
-        return res.status(400).json({success: false, message: "Something went wrong."})
+        if (!admin)
+            return res.status(404).json({ success: false, message: "Invalid email or password." });
+
+        const isMatch = await bcrypt.compare(password, admin.password);
+
+        if (!isMatch)
+            return res.status(404).json({ success: false, message: "Invalid email or password." });
+
+        if (admin.role !== "admin")
+            return res.status(403).json({ success: false, message: "You are not an administrator." });
+
+        const token = generateToken(admin._id, res);
+
+        return res.status(200).json({
+            success: true,
+            user: {
+                _id: admin._id,
+                fullName: admin.fullName,
+                email: admin.email,
+                phoneNumber: admin.phoneNumber,
+                role: admin.role,
+                isBlocked: admin.isBlocked,
+                cart: admin.cart, // ✅ Now includes product details
+                wishlist: admin.wishlist, // ✅ Now includes product details
+                token,
+            },
+        });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, message: "Something went wrong." });
     }
-}
+};
 
 const logout = async (req, res) => {
     try {
@@ -119,6 +175,7 @@ const logout = async (req, res) => {
 
 const authCheck = (req, res) => {
     try {
+        console.log(req.user)
         return res.status(200).json({success: true, user: req.user})
     } catch (error) {
         console.log("Error in authCheck controller:" + error.message)

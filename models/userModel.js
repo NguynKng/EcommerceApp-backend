@@ -28,8 +28,8 @@ var userSchema = new mongoose.Schema({
         default: false,
     },
     cart: {
-        type: Array,
-        default: [],
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Cart", // ✅ Reference the Cart model instead of an array
     },
     address: String,
     wishlist: [{

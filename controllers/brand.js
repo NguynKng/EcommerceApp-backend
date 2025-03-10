@@ -56,7 +56,7 @@ const updateBrandById = async (req, res) => {
             return res.status(400).json({ message: "Please fill in all fields" })
         
         const existingBrand = await brandModel.findOne({ name })
-        if(existingBrand && existingBrand._id.toString()!== id)
+        if(existingBrand && existingBrand._id.toString() !== id)
             return res.status(400).json({ success: false, message: "A brand with the same name already exists" })
         
         const updatedBrand = await brandModel.findByIdAndUpdate(id, { name }, { new: true })
