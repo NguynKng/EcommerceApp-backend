@@ -12,10 +12,6 @@ const orderSchema = new mongoose.Schema({
             required: true,
             min: 1
         },
-        color: {
-            type: String,
-            required: true
-        },
         price: { // ✅ Store product price at the time of order
             type: Number,
             required: true

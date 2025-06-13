@@ -37,7 +37,7 @@ const getCategory = async (req, res) => {
     try {        
         let { query } = req.query;
         let filter = query ? { name: { $regex: query, $options: "i" } } : {};
-        const categories = await productCategoryModel.find(filter)
+        const categories = await productCategoryModel.find(filter).sort({name:1})
         return res.status(200).json({ success: true, categories })
     } catch (err){
         console.error(err)

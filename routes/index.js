@@ -8,5 +8,6 @@ router.use('/blog-category', require('./blogCat'))
 router.use('/product-category', require('./productCat'))
 router.use('/brand', require('./brand'))
 router.use('/coupon', require('./coupon'))
+router.use('/crawl-blog', require('./crawlBlog'))
 
 module.exports = router

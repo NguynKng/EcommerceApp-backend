@@ -188,6 +188,8 @@ const addToCart = async (req, res) => {
             return res.status(404).json({ success: false, message: "Product not found." });
         }
 
+        const discountedPrice = product.price - (product.price * product.discount / 100)
+
         // Find or create the user's cart
         let cart = await cartModel.findOne({ orderBy: _id });
 
@@ -201,13 +203,13 @@ const addToCart = async (req, res) => {
         if (existingItem) {
             // Update quantity and price
             existingItem.quantity += quantity;
-            existingItem.price = existingItem.quantity * product.price;
+            existingItem.price = existingItem.quantity * discountedPrice;
         } else {
             // Add new product to cart
             cart.items.push({
                 product: productId,
                 quantity: quantity,
-                price: product.price * quantity,
+                price: discountedPrice * quantity,
             });
         }
 
@@ -471,5 +473,5 @@ const rating = async (req, res) => {
 }
 
 module.exports = { 
-    getUser, getUserById, deleteUserById, updateUserById, blockUser, unblockUser, updatePassword, getWishList, getUserCart,removeFromCart, addToCart, clearCart, applyCoupon, createOrder, getOrder, rating, addToWishList,  updateOrder
+    getUser, getUserById, deleteUserById, updateUserById, blockUser, unblockUser, updatePassword, getWishList, getUserCart,removeFromCart, addToCart, clearCart, applyCoupon, createOrder, getOrder, rating, addToWishList, updateOrder
  }

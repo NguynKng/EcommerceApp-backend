@@ -1,13 +1,16 @@
 const router = require("express").Router()
-const { addProduct, getProductByID, getProduct, getProductBySlug, updateProductById, deleteProductById } = require('../controllers/product')
+const { addProduct, getProductByID, getProduct, getCrawlData, getProductBySlug, updateProductById, deleteProductById, getFeaturedCollections, getSpecialProduct, getPopularProduct } = require('../controllers/product')
 const { authMiddleware, isAdmin } = require("../middlewares/authMiddleware")
-const { productImgResize } = require("../middlewares/uploadImg")
 
 router.get('', getProduct)
-router.post('/add', authMiddleware, isAdmin, addProduct)
+router.post('/add', addProduct)
 router.get('/:id', getProductByID)
 router.get('/slug/:slug', getProductBySlug)
 router.put('/:id', authMiddleware, isAdmin, updateProductById)
 router.delete('/:id', authMiddleware, isAdmin, deleteProductById)
+router.get("/crawl/data", getCrawlData)
+router.get("/get/featured-collection", getFeaturedCollections)
+router.get("/get/special-product", getSpecialProduct)
+router.get("/get/popular-product", getPopularProduct)
 
 module.exports = router

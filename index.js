@@ -8,7 +8,7 @@ const morgan = require('morgan')
 const cors = require('cors')
 
 const corsOptions = {
-    origin: 'http://178.128.85.73:5000', // Change this to your frontend's URL
+    origin: 'http://localhost:5173', // Change this to your frontend's URL
     methods: ['GET', 'POST', 'PUT', 'DELETE'], // Allowed HTTP methods
     credentials: true, // Allow credentials
 };

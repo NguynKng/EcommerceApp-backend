@@ -1,4 +1,5 @@
 const brandModel = require("../models/brandModel")
+const productModel = require("../models/productModel")
 
 const addBrand = async (req, res) => {
     try {
@@ -38,7 +39,7 @@ const getBrand = async (req, res) => {
         let { query } = req.query;
         let filter = query ? { name: { $regex: query, $options: "i" } } : {};
 
-        const brands = await brandModel.find(filter);
+        const brands = await brandModel.find(filter).sort({ name: 1 });
 
         return res.status(200).json({ success: true, brands })
     } catch (err){
@@ -82,10 +83,29 @@ const getBrandById = async (req, res) => {
     }
 }
 
+const getBrandsByCategory = async (req, res) => {
+    try {
+        const { category } = req.params;
+
+        if (!category) {
+            return res.status(400).json({ success: false, message: "Category is required" });
+        }
+
+        // Find distinct brands for the given category
+        const brands = await productModel.distinct("brand", { category: { $regex: `^${category}$`, $options: "i" } });
+
+        return res.status(200).json({ success: true, brands });
+    } catch (err) {
+        console.error("Error fetching brands:", err);
+        return res.status(500).json({ success: false, message: "Error fetching brands by category" });
+    }
+};
+
 module.exports = {
     addBrand,
     deleteBrand,
     getBrand,
     updateBrandById,
-    getBrandById
+    getBrandById,
+    getBrandsByCategory
 }
