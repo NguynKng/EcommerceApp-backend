@@ -21,21 +21,13 @@ const orderSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
-    address: { // ✅ Shipping Address
-        fullName: { type: String, required: true },
-        street: { type: String, required: true },
+    shipping: { // ✅ Shipping Address
+        firstName: { type: String, required: true },
+        lastName: { type: String, required: true },
+        phoneNumber: { type: String, required: true },
+        address: { type: String, required: true },
         city: { type: String, required: true },
-        state: { type: String, required: true },
-        zipCode: { type: String, required: true },
         country: { type: String, required: true },
-        phone: { type: String, required: true }
-    },
-    paymentIntent: { // ✅ Payment Details
-        id: String,
-        amount: Number,
-        currency: String,
-        status: String,
-        method: String
     },
     orderStatus: {
         type: String,

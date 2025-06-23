@@ -1,5 +1,5 @@
 const router = require("express").Router()
-const { addProduct, getProductByID, getProduct, getCrawlData, getProductBySlug, updateProductById, deleteProductById, getFeaturedCollections, getSpecialProduct, getPopularProduct } = require('../controllers/product')
+const { addProduct, getProductByID, getProduct, getCrawlData, getProductBySlug, updateProductById, deleteProductById, getFeaturedCollections, getSpecialProduct, getPopularProduct, getAllProduct } = require('../controllers/product')
 const { authMiddleware, isAdmin } = require("../middlewares/authMiddleware")
 
 router.get('', getProduct)
@@ -12,5 +12,6 @@ router.get("/crawl/data", getCrawlData)
 router.get("/get/featured-collection", getFeaturedCollections)
 router.get("/get/special-product", getSpecialProduct)
 router.get("/get/popular-product", getPopularProduct)
+router.get("/get/all", authMiddleware, isAdmin, getAllProduct)
 
 module.exports = router

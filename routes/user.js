@@ -1,5 +1,5 @@
 const router = require("express").Router()
-const { getUser, getUserById, deleteUserById, updateUserById, blockUser, unblockUser, updatePassword, getWishList,  getUserCart, removeFromCart, clearCart, addToCart, applyCoupon, createOrder, getOrder, updateOrder, rating, addToWishList } = require("../controllers/user")
+const { getUser, getUserById, deleteUserById, updateUserById, blockUser, unblockUser, updatePassword, getWishList,  getUserCart, removeFromCart, clearCart, addToCart, applyCoupon, getOrder, updateOrder, getOrderById, rating, addToWishList } = require("../controllers/user")
 const { authMiddleware, isAdmin } = require("../middlewares/authMiddleware")
 
 router.get("/", authMiddleware, isAdmin, getUser)
@@ -15,8 +15,8 @@ router.post("/cart", authMiddleware, addToCart)
 
 router.post("/cart/apply-coupon", authMiddleware, applyCoupon)
 
-router.post("/order", authMiddleware, createOrder)
 router.get("/order", authMiddleware, getOrder)
+router.get("/order/:id", authMiddleware, getOrderById)
 router.put("/order/:id", authMiddleware, isAdmin, updateOrder)
 
 
