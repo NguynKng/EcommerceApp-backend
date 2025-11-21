@@ -8,7 +8,7 @@ const morgan = require('morgan')
 const cors = require('cors')
 
 const corsOptions = {
-    origin: 'http://localhost:5173', // Change this to your frontend's URL
+    origin: ['http://localhost:5173', "https://zalo-demo-multi-tenant-website.vercel.app", "https://demo-multi-tenant-website.vercel.app/"], // Change this to your frontend's URL
     methods: ['GET', 'POST', 'PUT', 'DELETE'], // Allowed HTTP methods
     credentials: true, // Allow credentials
 };

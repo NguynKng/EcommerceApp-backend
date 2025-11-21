@@ -2,7 +2,7 @@ const router = require("express").Router()
 const { getUser, getUserById, deleteUserById, updateUserById, blockUser, unblockUser, updatePassword, getWishList,  getUserCart, removeFromCart, clearCart, addToCart, applyCoupon, getOrder, updateOrder, getOrderById, rating, addToWishList } = require("../controllers/user")
 const { authMiddleware, isAdmin } = require("../middlewares/authMiddleware")
 
-router.get("/", authMiddleware, isAdmin, getUser)
+router.get("/", getUser)
 
 router.get("/wishlist", authMiddleware, getWishList)
 router.put('/wishlist', authMiddleware, addToWishList)

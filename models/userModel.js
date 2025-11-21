@@ -31,7 +31,10 @@ var userSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "Cart", // ✅ Reference the Cart model instead of an array
     },
-    address: String,
+    isVerified: {
+        type: Boolean,
+        default: false,
+    },
     wishlist: [{
         type: mongoose.ObjectId,
         ref: "Product"

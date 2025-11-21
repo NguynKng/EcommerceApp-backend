@@ -10,5 +10,6 @@ router.use('/brand', require('./brand'))
 router.use('/coupon', require('./coupon'))
 router.use('/crawl-blog', require('./crawlBlog'))
 router.use('/order', require('./order'))
+router.use('/company', require('./company'))
 
 module.exports = router

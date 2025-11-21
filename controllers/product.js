@@ -86,13 +86,11 @@ const addProduct = async (req, res) => {
       });
       await newProduct.save();
 
-      return res
-        .status(201)
-        .json({
-          success: true,
-          product: newProduct,
-          message: "Add product successfully.",
-        });
+      return res.status(201).json({
+        success: true,
+        product: newProduct,
+        message: "Add product successfully.",
+      });
     });
   } catch (err) {
     console.error(err);
@@ -122,7 +120,10 @@ const getProductByID = async (req, res) => {
 const getProductBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
-    const product = await productModel.findOne({ slug }).populate("images");
+    const product = await productModel
+      .findOne({ slug })
+      .populate("images")
+      .populate("ratings.postedBy", "fullName");
 
     if (!product) {
       return res
@@ -285,12 +286,10 @@ const updateProductById = async (req, res) => {
         try {
           deleteImageIds = JSON.parse(req.body.deleteImageIds);
         } catch (parseError) {
-          return res
-            .status(400)
-            .json({
-              success: false,
-              message: "Invalid deleteImageIds format.",
-            });
+          return res.status(400).json({
+            success: false,
+            message: "Invalid deleteImageIds format.",
+          });
         }
       }
 
@@ -498,6 +497,55 @@ const getPopularProduct = async (req, res) => {
   }
 };
 
+const rateProduct = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { star, comment } = req.body;
+    const userId = req.user._id; // assuming you use auth middleware
+
+    if (!star || star < 1 || star > 5) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Star rating must be 1-5." });
+    }
+
+    const product = await productModel.findById(productId);
+    if (!product) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Product not found." });
+    }
+
+    // add new
+    product.ratings.push({
+      star,
+      comment,
+      postedBy: userId,
+      createdAt: new Date(),
+    });
+
+    // recalculate average rating
+    const totalStars = product.ratings.reduce((acc, r) => acc + r.star, 0);
+    product.totalRating = product.ratings.length
+      ? (totalStars / product.ratings.length).toFixed(1)
+      : 0;
+
+    await product.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Rating submitted successfully.",
+      product,
+    });
+  } catch (err) {
+    console.error("Rate Product Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error.",
+    });
+  }
+};
+
 module.exports = {
   addProduct,
   getProductByID,
@@ -510,4 +558,5 @@ module.exports = {
   getSpecialProduct,
   getPopularProduct,
   getAllProduct,
+  rateProduct,
 };

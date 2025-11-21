@@ -1,7 +1,7 @@
 const userModel = require("../models/userModel");
 const bcrypt = require("bcrypt");
 const generateToken = require("../utils/generateToken");
-const sendEmail = require("../utils/sendEmail");
+const sendVerificationEmail = require("../utils/sendEmail");
 const ResetToken = require("../models/resetToken");
 
 const signup = async (req, res) => {
@@ -50,6 +50,13 @@ const signup = async (req, res) => {
       phoneNumber,
     });
     await newUser.save();
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    await ResetToken.findOneAndDelete({ email }); // Xóa token cũ nếu có
+    await ResetToken.create({ email, code }); // Tạo token mới
+
+    await sendVerificationEmail(email, code, fullName, "verifyAccount");
 
     return res
       .status(200)
@@ -244,38 +251,11 @@ const forgotPassword = async (req, res) => {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
 
     await ResetToken.findOneAndDelete({ email }); // Xóa token cũ nếu có
-    await ResetToken.create({ email, code });     // Tạo token mới
+    await ResetToken.create({ email, code }); // Tạo token mới
 
-    // Thiết kế nội dung HTML đẹp
-    const htmlContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 24px; border-radius: 12px; background: #f9f9f9; border: 1px solid #ddd;">
-        <h2 style="color: #222;">🔐 Reset Your Password</h2>
-        <p style="font-size: 16px; color: #555;">
-          Hi <strong>${user.fullName || "there"}</strong>,<br/>
-          You requested to reset your password. Use the verification code below:
-        </p>
-        <div style="text-align: center; margin: 24px 0;">
-          <span style="display: inline-block; background: #007bff; color: white; font-size: 24px; font-weight: bold; padding: 12px 24px; border-radius: 8px;">
-            ${code}
-          </span>
-        </div>
-        <p style="font-size: 14px; color: #777;">
-          This code will expire in 5 minutes. If you didn't request a password reset, please ignore this email.
-        </p>
-        <hr style="margin: 32px 0; border: none; border-top: 1px solid #eee;" />
-        <p style="font-size: 12px; color: #aaa;">
-          Thanks,<br/>
-          MyShop Team
-        </p>
-      </div>
-    `;
+    const username = user.fullName;
 
-    await sendEmail({
-      to: email,
-      subject: "🔐 Your Password Reset Code",
-      text: `Your verification code is: ${code}`,
-      html: htmlContent,
-    });
+    await sendVerificationEmail(email, code, username, "resetPassword");
 
     res
       .status(200)
@@ -286,16 +266,16 @@ const forgotPassword = async (req, res) => {
   }
 };
 
-
-const verifyResetCode = async (req, res) => {
+const verifyCode = async (req, res) => {
   try {
-    const { email, code } = req.body;
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000); // 5 minutes ago
+    const { email, code, action } = req.body;
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 
+    // Check if valid reset token exists and is not expired
     const resetToken = await ResetToken.findOne({
       email,
       code,
-      createdAt: { $gt: fiveMinutesAgo }, // check not expired
+      createdAt: { $gt: fiveMinutesAgo },
     });
 
     if (!resetToken) {
@@ -305,12 +285,20 @@ const verifyResetCode = async (req, res) => {
       });
     }
 
+    if (action === "verifyAccount") {
+      await userModel.findOneAndUpdate(
+        { email },
+        { isVerified: true },
+        { new: true }
+      );
+    }
+
     return res.status(200).json({
       success: true,
       message: "Code verified",
     });
   } catch (err) {
-    console.error("Verify reset code error:", err);
+    console.error("Verify code error:", err);
     return res.status(500).json({
       success: false,
       message: "Server error",
@@ -362,6 +350,6 @@ module.exports = {
   loginAdmin,
   authCheck,
   forgotPassword,
-  verifyResetCode,
+  verifyCode,
   resetPassword,
 };
